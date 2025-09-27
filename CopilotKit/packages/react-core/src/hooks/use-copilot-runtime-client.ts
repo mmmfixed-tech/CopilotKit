@@ -98,7 +98,30 @@ export const useCopilotRuntimeClient = (options: CopilotRuntimeClientHookOptions
               setBannerError(ckError);
               // Trace the error
               traceUIError(ckError, gqlError);
-              // TODO: if onError & renderError should work without key, insert here
+              
+              // Call onError handler to allow custom error handling
+              try {
+                onError({
+                  type: "error",
+                  timestamp: Date.now(),
+                  context: {
+                    source: "ui",
+                    request: {
+                      operation: "runtimeClient",
+                      url: runtimeOptions.url,
+                      startTime: Date.now(),
+                    },
+                    technical: {
+                      environment: "browser",
+                      userAgent: typeof navigator !== "undefined" ? navigator.userAgent : undefined,
+                      stackTrace: gqlError.stack,
+                    },
+                  },
+                  error: ckError,
+                });
+              } catch (handlerError) {
+                console.error("Error in onError handler:", handlerError);
+              }
             } else {
               // Fallback for unstructured errors
               const fallbackError = new CopilotKitError({
@@ -108,7 +131,30 @@ export const useCopilotRuntimeClient = (options: CopilotRuntimeClientHookOptions
               setBannerError(fallbackError);
               // Trace the fallback error
               traceUIError(fallbackError, gqlError);
-              // TODO: if onError & renderError should work without key, insert here
+              
+              // Call onError handler for fallback error
+              try {
+                onError({
+                  type: "error",
+                  timestamp: Date.now(),
+                  context: {
+                    source: "ui",
+                    request: {
+                      operation: "runtimeClient",
+                      url: runtimeOptions.url,
+                      startTime: Date.now(),
+                    },
+                    technical: {
+                      environment: "browser",
+                      userAgent: typeof navigator !== "undefined" ? navigator.userAgent : undefined,
+                      stackTrace: gqlError.stack,
+                    },
+                  },
+                  error: fallbackError,
+                });
+              } catch (handlerError) {
+                console.error("Error in onError handler:", handlerError);
+              }
             }
           };
 
@@ -127,7 +173,30 @@ export const useCopilotRuntimeClient = (options: CopilotRuntimeClientHookOptions
             setBannerError(fallbackError);
             // Trace the non-GraphQL error
             traceUIError(fallbackError, error);
-            // TODO: if onError & renderError should work without key, insert here
+            
+            // Call onError handler for non-GraphQL error
+            try {
+              onError({
+                type: "error",
+                timestamp: Date.now(),
+                context: {
+                  source: "ui",
+                  request: {
+                    operation: "runtimeClient",
+                    url: runtimeOptions.url,
+                    startTime: Date.now(),
+                  },
+                  technical: {
+                    environment: "browser",
+                    userAgent: typeof navigator !== "undefined" ? navigator.userAgent : undefined,
+                    stackTrace: error instanceof Error ? error.stack : undefined,
+                  },
+                },
+                error: fallbackError,
+              });
+            } catch (handlerError) {
+              console.error("Error in onError handler:", handlerError);
+            }
           }
         }
       },

@@ -449,6 +449,13 @@ export function CopilotChat({
   const [selectedImages, setSelectedImages] = useState<Array<ImageUpload>>([]);
   const [chatError, setChatError] = useState<ChatError | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Store retry context for failed operations
+  const retryContextRef = useRef<{
+    operation: string;
+    data: any;
+    timestamp: number;
+  } | null>(null);
 
   // Helper function to trigger event hooks only if publicApiKey is provided
   const triggerObservabilityHook = useCallback(
@@ -473,8 +480,17 @@ export function CopilotChat({
 
   // Helper function to trigger chat error and render error UI
   const triggerChatError = useCallback(
-    (error: any, operation: string, originalError?: any) => {
+    (error: any, operation: string, originalError?: any, retryData?: any) => {
       const errorMessage = error?.message || error?.toString() || "An error occurred";
+
+      // Store retry context for recoverable operations
+      if (retryData) {
+        retryContextRef.current = {
+          operation,
+          data: retryData,
+          timestamp: Date.now(),
+        };
+      }
 
       // Set chat error state for rendering
       setChatError({
@@ -582,8 +598,9 @@ export function CopilotChat({
         const loadedImages = (await Promise.all(imagePromises)).filter((img) => img !== null);
         setSelectedImages((prev) => [...prev, ...loadedImages]);
       } catch (error) {
-        // Trigger chat-level error handler
-        triggerChatError(error, "processClipboardImages", error);
+        // Trigger chat-level error handler with retry context (though retry is limited for clipboard)
+        const clipboardItems = e.clipboardData?.items;
+        triggerChatError(error, "processClipboardImages", error, { clipboardItems });
         console.error("Error processing pasted images:", error);
       }
     };
@@ -648,6 +665,14 @@ export function CopilotChat({
   // Wrapper for sendMessage to clear selected images
   const handleSendMessage = (text: string) => {
     const images = selectedImages;
+    
+    // Store retry context before clearing state
+    retryContextRef.current = {
+      operation: "sendMessage",
+      data: { text, images },
+      timestamp: Date.now(),
+    };
+    
     setSelectedImages([]);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -711,8 +736,8 @@ export function CopilotChat({
       const loadedImages = await Promise.all(fileReadPromises);
       setSelectedImages((prev) => [...prev, ...loadedImages]);
     } catch (error) {
-      // Trigger chat-level error handler
-      triggerChatError(error, "processUploadedImages", error);
+      // Trigger chat-level error handler with retry context
+      triggerChatError(error, "processUploadedImages", error, { files });
       console.error("Error reading files:", error);
     }
   };
@@ -748,9 +773,59 @@ export function CopilotChat({
           ...chatError,
           onDismiss: () => setChatError(null),
           onRetry: () => {
-            // Clear error and potentially retry based on operation
+            // Clear error first
             setChatError(null);
-            // TODO: Implement specific retry logic based on operation type
+            
+            // Implement specific retry logic based on operation type
+            const retryContext = retryContextRef.current;
+            
+            if (!retryContext) {
+              console.warn("No retry context available");
+              return;
+            }
+            
+            const { operation, data } = retryContext;
+            
+            try {
+              switch (operation) {
+                case "sendMessage":
+                  if (data?.text) {
+                    // Restore selected images if they were part of the failed message
+                    if (data.images?.length > 0) {
+                      setSelectedImages(data.images);
+                    }
+                    // Retry sending the message
+                    sendMessage(data.text, data.images || []);
+                  }
+                  break;
+                  
+                case "processClipboardImages":
+                  if (data?.clipboardItems) {
+                    // Re-process clipboard images
+                    // Note: We can't re-trigger clipboard processing due to security restrictions
+                    console.info("Cannot retry clipboard processing - please paste again");
+                  }
+                  break;
+                  
+                case "processUploadedImages":
+                  if (data?.files) {
+                    // Re-process uploaded files
+                    const event = { target: { files: data.files } } as React.ChangeEvent<HTMLInputElement>;
+                    handleImageUpload(event);
+                  }
+                  break;
+                  
+                default:
+                  console.warn(`No retry handler for operation: ${operation}`);
+              }
+            } catch (retryError) {
+              console.error("Error during retry:", retryError);
+              // Set a new error for the retry failure
+              triggerChatError(retryError, `retry_${operation}`, retryError);
+            }
+            
+            // Clear retry context after use
+            retryContextRef.current = null;
           },
         })}
 
