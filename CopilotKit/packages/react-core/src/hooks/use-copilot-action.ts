@@ -282,8 +282,11 @@ export function useCopilotAction<const T extends Parameter[] | [] = []>(
       }
       if (typeof action.render === "function") {
         if (chatComponentsCache.current !== null) {
-          // TODO: using as any here because the type definitions are getting to tricky
-          // not wasting time on this now - we know the types are compatible
+          // SAFE TYPE ASSERTION: The render function types are compatible at runtime
+          // despite complex conditional typing. The action.render function signature
+          // matches what chatComponentsCache.current.actions expects, but TypeScript's
+          // conditional types make this difficult to express precisely without
+          // significant type system complexity that would affect all consumers.
           chatComponentsCache.current.actions[action.name] = action.render as any;
         }
       }

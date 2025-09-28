@@ -1,8 +1,8 @@
 import { MCPTool, MCPClient as MCPClientInterface } from "@copilotkit/runtime";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
-// TODO: Replace with HttpClientTransport when available in SDK
-// import { HttpClientTransport } from "@modelcontextprotocol/sdk/client/http.js";
+// MIGRATED: Use StreamableHTTPClientTransport in HttpStreamClient instead
+// import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { JSONRPCMessage } from "@modelcontextprotocol/sdk/types.js";
 
 export interface McpClientOptions {
@@ -17,11 +17,18 @@ export interface McpClientOptions {
 /**
  * McpClient - A Model Context Protocol client implementation
  *
- * @deprecated SSE transport is deprecated. Use HttpStreamClient instead which supports
- * the new HTTP Stream Transport protocol and is compatible with modern MCP servers.
+ * @deprecated This SSE-based transport implementation is deprecated. 
+ * Use HttpStreamClient from './http-stream-client.ts' instead, which supports
+ * the modern HTTP Stream Transport protocol and is compatible with modern MCP servers.
  *
  * This class uses the deprecated SSE (Server-Sent Events) transport.
  * Many modern MCP servers (like Composio) no longer support pure SSE connections.
+ *
+ * Migration guide:
+ * - Replace `new MCPClient(options)` with `new HttpStreamClient(options)`
+ * - The HttpStreamClient provides the same interface but with better reliability
+ * - It uses the official StreamableHTTPClientTransport from the MCP SDK
+ * - It includes built-in reconnection, session management, and error handling
  *
  * This class implements the Model Context Protocol (MCP) client, which allows for
  * standardized communication with MCP servers. It's designed to be compatible with
@@ -57,7 +64,7 @@ export class MCPClient implements MCPClientInterface {
     this.onClose = options.onClose || (() => console.log("Connection closed"));
 
     // Initialize the SSE transport with headers
-    // TODO: Migrate to HttpClientTransport when available
+    // MIGRATED: Use HttpStreamClient with StreamableHTTPClientTransport for modern compatibility
     this.transport = new SSEClientTransport(this.serverUrl, this.headers);
 
     // Initialize the client

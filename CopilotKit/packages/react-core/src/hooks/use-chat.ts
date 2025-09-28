@@ -538,7 +538,29 @@ export function useChat(options: UseChatOptions): UseChatHelpers {
               statusReason: value.generateCopilotResponse.status.reason,
               statusDetails: value.generateCopilotResponse.status.details,
             });
-            // TODO: if onError & renderError should work without key, insert here
+            
+            // Call onError handler for guardrails validation failure
+            try {
+              onError({
+                type: "error",
+                timestamp: Date.now(),
+                context: {
+                  source: "ui",
+                  request: {
+                    operation: "chatCompletion",
+                    url: copilotConfig.chatApiEndpoint,
+                    startTime: Date.now(),
+                  },
+                  technical: {
+                    environment: "browser",
+                    userAgent: typeof navigator !== "undefined" ? navigator.userAgent : undefined,
+                  },
+                },
+                error: guardrailsError,
+              });
+            } catch (handlerError) {
+              console.error("Error in onError handler:", handlerError);
+            }
 
             setMessages([...previousMessages, ...newMessages]);
             break;
@@ -587,7 +609,29 @@ export function useChat(options: UseChatOptions): UseChatHelpers {
               originalErrorCode: originalCode,
               preservedStructure: !!originalCode,
             });
-            // TODO: if onError & renderError should work without key, insert here
+            
+            // Call onError handler for unknown error
+            try {
+              onError({
+                type: "error",
+                timestamp: Date.now(),
+                context: {
+                  source: "ui",
+                  request: {
+                    operation: "chatCompletion",
+                    url: copilotConfig.chatApiEndpoint,
+                    startTime: Date.now(),
+                  },
+                  technical: {
+                    environment: "browser",
+                    userAgent: typeof navigator !== "undefined" ? navigator.userAgent : undefined,
+                  },
+                },
+                error: structuredError,
+              });
+            } catch (handlerError) {
+              console.error("Error in onError handler:", handlerError);
+            }
 
             // Stop processing and break from the loop
             setIsLoading(false);
